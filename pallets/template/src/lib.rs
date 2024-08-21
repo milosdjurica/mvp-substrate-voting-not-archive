@@ -20,16 +20,19 @@ pub mod pallet {
     }
 
     #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub enum ProposalState {
+        #[default]
+        Active,
+        Approved,
+        Rejected,
+    }
+
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
     pub struct Proposal<AccountId, BlockNumber> {
         pub creator: AccountId,
         pub description: Vec<u8>,
         pub end_block: BlockNumber,
-    }
-
-    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
-    pub struct FinishedProposal<AccountId, BlockNumber> {
-        pub proposal: Proposal<AccountId, BlockNumber>,
-        pub has_passed: bool,
+        pub proposal_state: ProposalState,
     }
 
     #[derive(Clone, Encode, Decode, Default, TypeInfo)]
