@@ -47,6 +47,11 @@ pub mod pallet {
             description: Vec<u8>,
             end_block: BlockNumberFor<T>,
         },
+        UserVoted {
+            proposal_id: u32,
+            voter: T::AccountId,
+            vote_is_yes: bool,
+        },
     }
 
     #[pallet::error]
@@ -128,6 +133,45 @@ pub mod pallet {
                 creator: sender,
                 description: description.clone(),
                 end_block,
+            });
+
+            Ok(())
+        }
+
+        #[pallet::weight(Weight::default())]
+        #[pallet::call_index(1)]
+        pub fn vote(origin: OriginFor<T>, proposal_id: u32, vote_is_yes: bool) -> DispatchResult {
+            let voter = ensure_signed(origin)?;
+
+            // ! Check if proposal exist
+            let proposal =
+                Self::active_proposals(proposal_id).ok_or(Error::<T>::ProposalDoesNotExist)?;
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            // ! Check if proposal is active
+            ensure!(
+                current_block <= proposal.end_block,
+                Error::<T>::ProposalIsNotActive
+            );
+
+            // ! Check if user already voted
+            ensure!(
+                !Self::user_has_voted_on_proposal((voter.clone(), proposal_id)),
+                Error::<T>::UserAlreadyVoted
+            );
+
+            // ! Vote
+            let vote = Vote {
+                voter: voter.clone(),
+                vote_is_yes,
+            };
+            <ProposalToVotes<T>>::append(proposal_id, vote);
+            <UserHasVotedOnProposal<T>>::insert((voter.clone(), proposal_id), true);
+
+            // ! Emit
+            Self::deposit_event(Event::UserVoted {
+                proposal_id,
+                voter: voter.clone(),
+                vote_is_yes,
             });
 
             Ok(())
