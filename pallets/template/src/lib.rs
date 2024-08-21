@@ -11,6 +11,7 @@ pub mod pallet {
     use scale_info::prelude::vec::Vec;
 
     #[pallet::pallet]
+    #[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
     #[pallet::config]
@@ -62,8 +63,18 @@ pub mod pallet {
     }
 
     #[pallet::storage]
-    pub(super) type Claims<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::Hash, (T::AccountId, BlockNumberFor<T>)>;
+    #[pallet::getter(fn proposal_counter)]
+    pub(super) type ProposalCounter<T> = StorageValue<_, u32, ValueQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn active_proposals)]
+    pub(super) type ActiveProposals<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u32,
+        Proposal<T::AccountId, BlockNumberFor<T>>,
+        OptionQuery,
+    >;
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
