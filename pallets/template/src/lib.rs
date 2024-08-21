@@ -1,7 +1,5 @@
-// All pallets must be configured for `no_std`.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-// Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 
 #[frame_support::pallet]
@@ -21,20 +19,23 @@ pub mod pallet {
     }
 
     #[derive(Clone, Encode, Decode, Default, TypeInfo)]
-    pub enum ProposalState {
-        #[default]
-        Active,
-        Approved,
-        Rejected,
-    }
-
-    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
     pub struct Proposal<AccountId, BlockNumber> {
         pub creator: AccountId,
         // TODO add max length???
         pub description: Vec<u8>,
         pub end_block: BlockNumber,
-        pub proposal_state: ProposalState,
+    }
+
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct FinishedProposal<AccountId, BlockNumber> {
+        pub proposal: Proposal<AccountId, BlockNumber>,
+        pub is_approved: bool,
+    }
+
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct Vote<AccountId> {
+        pub voter: AccountId,
+        pub vote_is_yes: bool,
     }
 
     #[pallet::event]
@@ -60,13 +61,43 @@ pub mod pallet {
     pub(super) type ProposalCounter<T> = StorageValue<_, u32, ValueQuery>;
 
     #[pallet::storage]
-    #[pallet::getter(fn proposals)]
-    pub(super) type Proposals<T: Config> = StorageMap<
+    #[pallet::getter(fn active_proposals)]
+    pub(super) type ActiveProposals<T: Config> = StorageMap<
         _,
         Blake2_128Concat,
         u32,
         Proposal<T::AccountId, BlockNumberFor<T>>,
         OptionQuery,
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn finished_proposals)]
+    pub(super) type FinishedProposals<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u32,
+        FinishedProposal<T::AccountId, BlockNumberFor<T>>,
+        OptionQuery,
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn proposal_to_votes)]
+    pub(super) type ProposalToVotes<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u32,                     // Proposal ID
+        Vec<Vote<T::AccountId>>, // List of votes
+        OptionQuery,
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn user_has_voted_on_proposal)]
+    pub(super) type UserHasVotedOnProposal<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        (T::AccountId, u32), // AccountId, Proposal ID
+        bool,                // Did vote or did not vote
+        ValueQuery,
     >;
 
     #[pallet::call]
@@ -87,10 +118,9 @@ pub mod pallet {
                 creator: sender.clone(),
                 description: description.clone(),
                 end_block,
-                proposal_state: ProposalState::Active,
             };
 
-            <Proposals<T>>::insert(next_id, new_proposal);
+            <ActiveProposals<T>>::insert(next_id, new_proposal);
             <ProposalCounter<T>>::put(next_id);
 
             Self::deposit_event(Event::ProposalCreated {
