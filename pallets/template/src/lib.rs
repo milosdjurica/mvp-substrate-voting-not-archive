@@ -7,6 +7,7 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::pallet_prelude::*;
+    use frame_support::sp_runtime::ArithmeticError;
     use frame_system::pallet_prelude::*;
     use scale_info::prelude::vec::Vec;
 
@@ -30,15 +31,10 @@ pub mod pallet {
     #[derive(Clone, Encode, Decode, Default, TypeInfo)]
     pub struct Proposal<AccountId, BlockNumber> {
         pub creator: AccountId,
+        // TODO add max length???
         pub description: Vec<u8>,
         pub end_block: BlockNumber,
         pub proposal_state: ProposalState,
-    }
-
-    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
-    pub struct Vote<AccountId> {
-        pub voter: AccountId,
-        pub vote_is_yes: bool,
     }
 
     #[pallet::event]
@@ -49,12 +45,6 @@ pub mod pallet {
             creator: T::AccountId,
             description: Vec<u8>,
             end_block: BlockNumberFor<T>,
-        },
-
-        UserVoted {
-            proposal_id: u32,
-            voter: T::AccountId,
-            vote_is_yes: bool,
         },
     }
 
@@ -70,8 +60,8 @@ pub mod pallet {
     pub(super) type ProposalCounter<T> = StorageValue<_, u32, ValueQuery>;
 
     #[pallet::storage]
-    #[pallet::getter(fn active_proposals)]
-    pub(super) type ActiveProposals<T: Config> = StorageMap<
+    #[pallet::getter(fn proposals)]
+    pub(super) type Proposals<T: Config> = StorageMap<
         _,
         Blake2_128Concat,
         u32,
@@ -83,7 +73,33 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         #[pallet::weight(Weight::default())]
         #[pallet::call_index(0)]
-        pub fn create_claim(origin: OriginFor<T>, claim: T::Hash) -> DispatchResult {
+        pub fn create_proposal(
+            origin: OriginFor<T>,
+            description: Vec<u8>,
+            end_block: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+
+            let current_id = Self::proposal_counter();
+            let next_id = current_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
+
+            let new_proposal = Proposal {
+                creator: sender.clone(),
+                description: description.clone(),
+                end_block,
+                proposal_state: ProposalState::Active,
+            };
+
+            <Proposals<T>>::insert(next_id, new_proposal);
+            <ProposalCounter<T>>::put(next_id);
+
+            Self::deposit_event(Event::ProposalCreated {
+                proposal_id: next_id,
+                creator: sender,
+                description: description.clone(),
+                end_block,
+            });
+
             Ok(())
         }
     }
