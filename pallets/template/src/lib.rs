@@ -37,11 +37,9 @@ pub mod pallet {
 
     #[pallet::error]
     pub enum Error<T> {
-        AlreadyClaimed,
-
-        NoSuchClaim,
-
-        NotClaimOwner,
+        ProposalDoesNotExist,
+        ProposalIsNotActive,
+        UserAlreadyVoted,
     }
 
     #[pallet::storage]
