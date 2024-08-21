@@ -8,6 +8,7 @@ pub use pallet::*;
 pub mod pallet {
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
+    use scale_info::prelude::vec::Vec;
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
@@ -20,8 +21,18 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        ClaimCreated { who: T::AccountId, claim: T::Hash },
-        ClaimRevoked { who: T::AccountId, claim: T::Hash },
+        ProposalCreated {
+            proposal_id: u32,
+            creator: T::AccountId,
+            description: Vec<u8>,
+            end_block: BlockNumberFor<T>,
+        },
+
+        UserVoted {
+            proposal_id: u32,
+            voter: T::AccountId,
+            vote_is_yes: bool,
+        },
     }
 
     #[pallet::error]
