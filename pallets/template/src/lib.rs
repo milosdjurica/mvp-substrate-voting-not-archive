@@ -18,6 +18,25 @@ pub mod pallet {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
     }
 
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct Proposal<AccountId, BlockNumber> {
+        pub creator: AccountId,
+        pub description: Vec<u8>,
+        pub end_block: BlockNumber,
+    }
+
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct FinishedProposal<AccountId, BlockNumber> {
+        pub proposal: Proposal<AccountId, BlockNumber>,
+        pub has_passed: bool,
+    }
+
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct Vote<AccountId> {
+        pub voter: AccountId,
+        pub vote_is_yes: bool,
+    }
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
