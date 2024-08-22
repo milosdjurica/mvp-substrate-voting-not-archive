@@ -52,6 +52,11 @@ pub mod pallet {
             voter: T::AccountId,
             vote_is_yes: bool,
         },
+
+        ProposalFinalized {
+            proposal_id: u32,
+            is_approved: bool,
+        },
     }
 
     #[pallet::error]
@@ -59,6 +64,7 @@ pub mod pallet {
         ProposalDoesNotExist,
         ProposalIsNotActive,
         UserAlreadyVoted,
+        TooEarlyToFinalize,
     }
 
     #[pallet::storage]
@@ -116,8 +122,8 @@ pub mod pallet {
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
 
-            let current_id = Self::proposal_counter();
-            let next_id = current_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
+            let old_id = Self::proposal_counter();
+            let new_id = old_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
 
             let new_proposal = Proposal {
                 creator: sender.clone(),
@@ -125,11 +131,11 @@ pub mod pallet {
                 end_block,
             };
 
-            <ActiveProposals<T>>::insert(next_id, new_proposal);
-            <ProposalCounter<T>>::put(next_id);
+            <ActiveProposals<T>>::insert(new_id, new_proposal);
+            <ProposalCounter<T>>::put(new_id);
 
             Self::deposit_event(Event::ProposalCreated {
-                proposal_id: next_id,
+                proposal_id: new_id,
                 creator: sender,
                 description: description.clone(),
                 end_block,
@@ -175,6 +181,48 @@ pub mod pallet {
             });
 
             Ok(())
+        }
+
+        #[pallet::weight(Weight::default())]
+        #[pallet::call_index(2)]
+        pub fn finalize_proposal(origin: OriginFor<T>, proposal_id: u32) -> DispatchResult {
+            let _caller = ensure_signed(origin)?;
+
+            let proposal = Self::active_proposals(proposal_id)
+                .ok_or(Error::<T>::ProposalDoesNotExist)
+                .unwrap();
+
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            ensure!(
+                current_block > proposal.end_block,
+                Error::<T>::TooEarlyToFinalize,
+            );
+
+            let finished_proposal = FinishedProposal {
+                proposal,
+                is_approved: Self::is_proposal_approved(proposal_id),
+            };
+
+            <FinishedProposals<T>>::insert(proposal_id, finished_proposal.clone());
+            <ActiveProposals<T>>::remove(proposal_id);
+
+            Self::deposit_event(Event::ProposalFinalized {
+                proposal_id,
+                is_approved: finished_proposal.is_approved,
+            });
+
+            Ok(())
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        fn is_proposal_approved(proposal_id: u32) -> bool {
+            let votes = Self::proposal_to_votes(proposal_id).unwrap_or_default();
+            let total_votes = votes.len() as u32;
+            let yes_votes = votes.iter().filter(|v| v.vote_is_yes).count() as u32;
+
+            // Example criteria: if yes votes are more than half
+            yes_votes > total_votes / 2
         }
     }
 }
