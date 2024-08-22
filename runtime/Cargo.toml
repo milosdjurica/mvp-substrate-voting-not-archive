@@ -14,6 +14,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 # ! Scheduler
+# pallet-timestamp = { version = "4.0.0-dev", default-features = false, path = "https://github.com/paritytech/polkadot-sdk/tree/master/substrate/frame/timestamp" }
 # pallet-scheduler = { default-features = false, version = "38.0.0", repository = "https://github.com/paritytech/polkadot-sdk" }
 codec = { features = ["derive"], workspace = true }
 scale-info = { features = ["derive", "serde"], workspace = true }

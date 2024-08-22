@@ -6,6 +6,7 @@ pub use pallet::*;
 pub mod pallet {
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
+    // use pallet_timestamp::{self as timestamp};
     use scale_info::prelude::vec::Vec;
 
     #[pallet::pallet]
