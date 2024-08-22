@@ -13,11 +13,17 @@ publish = false
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+# pallet-timestamp = { features = [
+# 	"derive",
+# ], workspace = true, version = "36.0.0" }
+# pallet-timestamp = "34.0.0"
+# getrandom = { version = "0.2", features = ["js"] }
 codec = { features = ["derive"], workspace = true }
 scale-info = { features = ["derive"], workspace = true }
 frame-benchmarking = { optional = true, workspace = true }
 frame-support.workspace = true
 frame-system.workspace = true
+# pallet-timestamp.workspace = true
 
 [dev-dependencies]
 sp-core = { default-features = true, workspace = true }
@@ -31,7 +37,7 @@ std = [
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
-	# "pallet-timestamp/std"
+	# "pallet-timestamp/std",
 	"scale-info/std",
 ]
 runtime-benchmarks = [
