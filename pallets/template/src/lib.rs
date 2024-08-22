@@ -5,7 +5,6 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::pallet_prelude::*;
-    use frame_support::sp_runtime::ArithmeticError;
     use frame_system::pallet_prelude::*;
     use scale_info::prelude::vec::Vec;
 
@@ -56,6 +55,8 @@ pub mod pallet {
         ProposalFinalized {
             proposal_id: u32,
             is_approved: bool,
+            total_votes: u32,
+            yes_votes: u32,
         },
     }
 
@@ -65,6 +66,9 @@ pub mod pallet {
         ProposalIsNotActive,
         UserAlreadyVoted,
         TooEarlyToFinalize,
+        EndBlockIsTooSmall,
+        DescriptionIsTooLong,
+        Overflow,
     }
 
     #[pallet::storage]
@@ -112,6 +116,7 @@ pub mod pallet {
     >;
 
     #[pallet::call]
+
     impl<T: Config> Pallet<T> {
         #[pallet::weight(Weight::default())]
         #[pallet::call_index(0)]
@@ -123,7 +128,23 @@ pub mod pallet {
             let sender = ensure_signed(origin)?;
 
             let old_id = Self::proposal_counter();
-            let new_id = old_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
+            let new_id = old_id.checked_add(1).ok_or(Error::<T>::Overflow)?;
+
+            // ! Check if end_block > current + min_diff
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            let min_difference: BlockNumberFor<T> = 5u32.into();
+
+            ensure!(
+                end_block > current_block + min_difference,
+                Error::<T>::EndBlockIsTooSmall
+            );
+
+            // ! Check if description too long
+            let max_description_length = 256u32;
+            ensure!(
+                description.len() as u32 <= max_description_length,
+                Error::<T>::DescriptionIsTooLong
+            );
 
             let new_proposal = Proposal {
                 creator: sender.clone(),
@@ -198,17 +219,22 @@ pub mod pallet {
                 Error::<T>::TooEarlyToFinalize,
             );
 
+            let (total_votes, yes_votes) = Self::get_vote_counts(proposal_id);
+
             let finished_proposal = FinishedProposal {
                 proposal,
-                is_approved: Self::is_proposal_approved(proposal_id),
+                is_approved: yes_votes * 2 > total_votes,
             };
 
             <FinishedProposals<T>>::insert(proposal_id, finished_proposal.clone());
             <ActiveProposals<T>>::remove(proposal_id);
 
+            // ! Emit number of YES vs number of NO
             Self::deposit_event(Event::ProposalFinalized {
                 proposal_id,
                 is_approved: finished_proposal.is_approved,
+                total_votes,
+                yes_votes,
             });
 
             Ok(())
@@ -216,13 +242,12 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
-        fn is_proposal_approved(proposal_id: u32) -> bool {
+        fn get_vote_counts(proposal_id: u32) -> (u32, u32) {
             let votes = Self::proposal_to_votes(proposal_id).unwrap_or_default();
             let total_votes = votes.len() as u32;
             let yes_votes = votes.iter().filter(|v| v.vote_is_yes).count() as u32;
 
-            // Example criteria: if yes votes are more than half
-            yes_votes > total_votes / 2
+            (total_votes, yes_votes)
         }
     }
 }
