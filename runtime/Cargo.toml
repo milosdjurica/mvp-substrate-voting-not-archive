@@ -13,13 +13,10 @@ publish = false
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-codec = { features = [
-	"derive",
-], workspace = true }
-scale-info = { features = [
-	"derive",
-	"serde",
-], workspace = true }
+# ! Scheduler
+# pallet-scheduler = { default-features = false, version = "38.0.0", repository = "https://github.com/paritytech/polkadot-sdk" }
+codec = { features = ["derive"], workspace = true }
+scale-info = { features = ["derive", "serde"], workspace = true }
 frame-support = { features = ["experimental"], workspace = true }
 frame-system.workspace = true
 frame-try-runtime = { optional = true, workspace = true }
@@ -91,6 +88,9 @@ std = [
 	"sp-version/std",
 
 	"substrate-wasm-builder",
+
+	# ! Scheduler
+	# "pallet-scheduler/std",
 ]
 
 runtime-benchmarks = [
