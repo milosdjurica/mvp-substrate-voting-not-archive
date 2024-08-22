@@ -1,202 +1,228 @@
-//! # Template Pallet
-//!
-//! A pallet with minimal functionality to help developers understand the essential components of
-//! writing a FRAME pallet. It is typically used in beginner tutorials or in Substrate template
-//! nodes as a starting point for creating a new pallet and **not meant to be used in production**.
-//!
-//! ## Overview
-//!
-//! This template pallet contains basic examples of:
-//! - declaring a storage item that stores a single `u32` value
-//! - declaring and using events
-//! - declaring and using errors
-//! - a dispatchable function that allows a user to set a new value to storage and emits an event
-//!   upon success
-//! - another dispatchable function that causes a custom error to be thrown
-//!
-//! Each pallet section is annotated with an attribute using the `#[pallet::...]` procedural macro.
-//! This macro generates the necessary code for a pallet to be aggregated into a FRAME runtime.
-//!
-//! Learn more about FRAME macros [here](https://docs.substrate.io/reference/frame-macros/).
-//!
-//! ### Pallet Sections
-//!
-//! The pallet sections in this template are:
-//!
-//! - A **configuration trait** that defines the types and parameters which the pallet depends on
-//!   (denoted by the `#[pallet::config]` attribute). See: [`Config`].
-//! - A **means to store pallet-specific data** (denoted by the `#[pallet::storage]` attribute).
-//!   See: [`storage_types`].
-//! - A **declaration of the events** this pallet emits (denoted by the `#[pallet::event]`
-//!   attribute). See: [`Event`].
-//! - A **declaration of the errors** that this pallet can throw (denoted by the `#[pallet::error]`
-//!   attribute). See: [`Error`].
-//! - A **set of dispatchable functions** that define the pallet's functionality (denoted by the
-//!   `#[pallet::call]` attribute). See: [`dispatchables`].
-//!
-//! Run `cargo doc --package pallet-template --open` to view this pallet's documentation.
-
-// We make sure this pallet uses `no_std` for compiling to Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-// Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 
-// FRAME pallets require their own "mock runtimes" to be able to run unit tests. This module
-// contains a mock runtime specific for testing this pallet's functionality.
-#[cfg(test)]
-mod mock;
-
-// This module contains the unit tests for this pallet.
-// Learn about pallet unit testing here: https://docs.substrate.io/test/unit-testing/
-#[cfg(test)]
-mod tests;
-
-// Every callable function or "dispatchable" a pallet exposes must have weight values that correctly
-// estimate a dispatchable's execution time. The benchmarking module is used to calculate weights
-// for each dispatchable and generates this pallet's weight.rs file. Learn more about benchmarking here: https://docs.substrate.io/test/benchmark/
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-pub mod weights;
-pub use weights::*;
-
-// All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
 #[frame_support::pallet]
 pub mod pallet {
-	// Import various useful types required by all FRAME pallets.
-	use super::*;
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
+    use frame_support::pallet_prelude::*;
+    use frame_support::sp_runtime::ArithmeticError;
+    use frame_system::pallet_prelude::*;
+    use scale_info::prelude::vec::Vec;
 
-	// The `Pallet` struct serves as a placeholder to implement traits, methods and dispatchables
-	// (`Call`s) in this pallet.
-	#[pallet::pallet]
-	pub struct Pallet<T>(_);
+    #[pallet::pallet]
+    #[pallet::without_storage_info]
+    pub struct Pallet<T>(_);
 
-	/// The pallet's configuration trait.
-	///
-	/// All our types and constants a pallet depends on must be declared here.
-	/// These types are defined generically and made concrete when the pallet is declared in the
-	/// `runtime/src/lib.rs` file of your chain.
-	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		/// The overarching runtime event type.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// A type representing the weights required by the dispatchables of this pallet.
-		type WeightInfo: WeightInfo;
-	}
+    #[pallet::config]
+    pub trait Config: frame_system::Config {
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+    }
 
-	/// A storage item for this pallet.
-	///
-	/// In this template, we are declaring a storage item called `Something` that stores a single
-	/// `u32` value. Learn more about runtime storage here: <https://docs.substrate.io/build/runtime-storage/>
-	#[pallet::storage]
-	pub type Something<T> = StorageValue<_, u32>;
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct Proposal<AccountId, BlockNumber> {
+        pub creator: AccountId,
+        // TODO add max length???
+        pub description: Vec<u8>,
+        pub end_block: BlockNumber,
+    }
 
-	/// Events that functions in this pallet can emit.
-	///
-	/// Events are a simple means of indicating to the outside world (such as dApps, chain explorers
-	/// or other users) that some notable update in the runtime has occurred. In a FRAME pallet, the
-	/// documentation for each event field and its parameters is added to a node's metadata so it
-	/// can be used by external interfaces or tools.
-	///
-	///	The `generate_deposit` macro generates a function on `Pallet` called `deposit_event` which
-	/// will convert the event type of your pallet into `RuntimeEvent` (declared in the pallet's
-	/// [`Config`] trait) and deposit it using [`frame_system::Pallet::deposit_event`].
-	#[pallet::event]
-	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
-		/// A user has successfully set a new value.
-		SomethingStored {
-			/// The new value set.
-			something: u32,
-			/// The account who set the new value.
-			who: T::AccountId,
-		},
-	}
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct FinishedProposal<AccountId, BlockNumber> {
+        pub proposal: Proposal<AccountId, BlockNumber>,
+        pub is_approved: bool,
+    }
 
-	/// Errors that can be returned by this pallet.
-	///
-	/// Errors tell users that something went wrong so it's important that their naming is
-	/// informative. Similar to events, error documentation is added to a node's metadata so it's
-	/// equally important that they have helpful documentation associated with them.
-	///
-	/// This type of runtime error can be up to 4 bytes in size should you want to return additional
-	/// information.
-	#[pallet::error]
-	pub enum Error<T> {
-		/// The value retrieved was `None` as no value was previously set.
-		NoneValue,
-		/// There was an attempt to increment the value in storage over `u32::MAX`.
-		StorageOverflow,
-	}
+    #[derive(Clone, Encode, Decode, Default, TypeInfo)]
+    pub struct Vote<AccountId> {
+        pub voter: AccountId,
+        pub vote_is_yes: bool,
+    }
 
-	/// The pallet's dispatchable functions ([`Call`]s).
-	///
-	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	/// These functions materialize as "extrinsics", which are often compared to transactions.
-	/// They must always return a `DispatchResult` and be annotated with a weight and call index.
-	///
-	/// The [`call_index`] macro is used to explicitly
-	/// define an index for calls in the [`Call`] enum. This is useful for pallets that may
-	/// introduce new dispatchables over time. If the order of a dispatchable changes, its index
-	/// will also change which will break backwards compatibility.
-	///
-	/// The [`weight`] macro is used to assign a weight to each call.
-	#[pallet::call]
-	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a single u32 value as a parameter, writes the value
-		/// to storage and emits an event.
-		///
-		/// It checks that the _origin_ for this call is _Signed_ and returns a dispatch
-		/// error if it isn't. Learn more about origins here: <https://docs.substrate.io/build/origins/>
-		#[pallet::call_index(0)]
-		#[pallet::weight(T::WeightInfo::do_something())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			let who = ensure_signed(origin)?;
+    #[pallet::event]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
+    pub enum Event<T: Config> {
+        ProposalCreated {
+            proposal_id: u32,
+            creator: T::AccountId,
+            description: Vec<u8>,
+            end_block: BlockNumberFor<T>,
+        },
+        UserVoted {
+            proposal_id: u32,
+            voter: T::AccountId,
+            vote_is_yes: bool,
+        },
 
-			// Update storage.
-			Something::<T>::put(something);
+        ProposalFinalized {
+            proposal_id: u32,
+            is_approved: bool,
+        },
+    }
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored { something, who });
+    #[pallet::error]
+    pub enum Error<T> {
+        ProposalDoesNotExist,
+        ProposalIsNotActive,
+        UserAlreadyVoted,
+        TooEarlyToFinalize,
+    }
 
-			// Return a successful `DispatchResult`
-			Ok(())
-		}
+    #[pallet::storage]
+    #[pallet::getter(fn proposal_counter)]
+    pub(super) type ProposalCounter<T> = StorageValue<_, u32, ValueQuery>;
 
-		/// An example dispatchable that may throw a custom error.
-		///
-		/// It checks that the caller is a signed origin and reads the current value from the
-		/// `Something` storage item. If a current value exists, it is incremented by 1 and then
-		/// written back to storage.
-		///
-		/// ## Errors
-		///
-		/// The function will return an error under the following conditions:
-		///
-		/// - If no value has been set ([`Error::NoneValue`])
-		/// - If incrementing the value in storage causes an arithmetic overflow
-		///   ([`Error::StorageOverflow`])
-		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::cause_error())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+    #[pallet::storage]
+    #[pallet::getter(fn active_proposals)]
+    pub(super) type ActiveProposals<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u32,
+        Proposal<T::AccountId, BlockNumberFor<T>>,
+        OptionQuery,
+    >;
 
-			// Read a value from storage.
-			match Something::<T>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage. This will cause an error in the event
-					// of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					Something::<T>::put(new);
-					Ok(())
-				},
-			}
-		}
-	}
+    #[pallet::storage]
+    #[pallet::getter(fn finished_proposals)]
+    pub(super) type FinishedProposals<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u32,
+        FinishedProposal<T::AccountId, BlockNumberFor<T>>,
+        OptionQuery,
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn proposal_to_votes)]
+    pub(super) type ProposalToVotes<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u32,                     // Proposal ID
+        Vec<Vote<T::AccountId>>, // List of votes
+        OptionQuery,
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn user_has_voted_on_proposal)]
+    pub(super) type UserHasVotedOnProposal<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        (T::AccountId, u32), // AccountId, Proposal ID
+        bool,                // Did vote or did not vote
+        ValueQuery,
+    >;
+
+    #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        #[pallet::weight(Weight::default())]
+        #[pallet::call_index(0)]
+        pub fn create_proposal(
+            origin: OriginFor<T>,
+            description: Vec<u8>,
+            end_block: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+
+            let old_id = Self::proposal_counter();
+            let new_id = old_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
+
+            let new_proposal = Proposal {
+                creator: sender.clone(),
+                description: description.clone(),
+                end_block,
+            };
+
+            <ActiveProposals<T>>::insert(new_id, new_proposal);
+            <ProposalCounter<T>>::put(new_id);
+
+            Self::deposit_event(Event::ProposalCreated {
+                proposal_id: new_id,
+                creator: sender,
+                description: description.clone(),
+                end_block,
+            });
+
+            Ok(())
+        }
+
+        #[pallet::weight(Weight::default())]
+        #[pallet::call_index(1)]
+        pub fn vote(origin: OriginFor<T>, proposal_id: u32, vote_is_yes: bool) -> DispatchResult {
+            let voter = ensure_signed(origin)?;
+
+            // ! Check if proposal exist
+            let proposal =
+                Self::active_proposals(proposal_id).ok_or(Error::<T>::ProposalDoesNotExist)?;
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            // ! Check if proposal is active
+            ensure!(
+                current_block <= proposal.end_block,
+                Error::<T>::ProposalIsNotActive
+            );
+
+            // ! Check if user already voted
+            ensure!(
+                !Self::user_has_voted_on_proposal((voter.clone(), proposal_id)),
+                Error::<T>::UserAlreadyVoted
+            );
+
+            // ! Vote
+            let vote = Vote {
+                voter: voter.clone(),
+                vote_is_yes,
+            };
+            <ProposalToVotes<T>>::append(proposal_id, vote);
+            <UserHasVotedOnProposal<T>>::insert((voter.clone(), proposal_id), true);
+
+            // ! Emit
+            Self::deposit_event(Event::UserVoted {
+                proposal_id,
+                voter: voter.clone(),
+                vote_is_yes,
+            });
+
+            Ok(())
+        }
+
+        #[pallet::weight(Weight::default())]
+        #[pallet::call_index(2)]
+        pub fn finalize_proposal(origin: OriginFor<T>, proposal_id: u32) -> DispatchResult {
+            let _caller = ensure_signed(origin)?;
+
+            let proposal = Self::active_proposals(proposal_id)
+                .ok_or(Error::<T>::ProposalDoesNotExist)
+                .unwrap();
+
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            ensure!(
+                current_block > proposal.end_block,
+                Error::<T>::TooEarlyToFinalize,
+            );
+
+            let finished_proposal = FinishedProposal {
+                proposal,
+                is_approved: Self::is_proposal_approved(proposal_id),
+            };
+
+            <FinishedProposals<T>>::insert(proposal_id, finished_proposal.clone());
+            <ActiveProposals<T>>::remove(proposal_id);
+
+            Self::deposit_event(Event::ProposalFinalized {
+                proposal_id,
+                is_approved: finished_proposal.is_approved,
+            });
+
+            Ok(())
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        fn is_proposal_approved(proposal_id: u32) -> bool {
+            let votes = Self::proposal_to_votes(proposal_id).unwrap_or_default();
+            let total_votes = votes.len() as u32;
+            let yes_votes = votes.iter().filter(|v| v.vote_is_yes).count() as u32;
+
+            // Example criteria: if yes votes are more than half
+            yes_votes > total_votes / 2
+        }
+    }
 }
